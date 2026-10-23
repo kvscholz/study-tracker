@@ -1,0 +1,8 @@
+# Môi trường ảo Python (Bắt buộc bỏ qua)
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Dữ liệu học tập cá nhân (Tùy chọn: bỏ qua nếu không muốn công khai lịch sử)
+study_history.csv
