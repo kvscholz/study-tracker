@@ -1,10 +1,12 @@
 """
 Ứng dụng Study Tracker Dashboard v2.0 (Terminal UI)
 Sử dụng thư viện Textual trong Python
-Tính năng v2.0:
+Tính năng:
 1. Lưu trữ dữ liệu vĩnh viễn với tệp CSV (study_history.csv)
 2. Tự động chặn và bỏ chặn web xao nhãng (/etc/hosts)
 3. Âm thanh chuông paplay và thông báo notify-send bất đồng bộ
+4. Tách biệt chế độ Test nhanh (Phím T) không ghi dữ liệu vào CSV/thống kê
+5. Tính năng xóa dòng nhật ký đã chọn (Phím D hoặc Delete)
 """
 
 import atexit
@@ -102,7 +104,7 @@ Screen {
 }
 
 #main-container {
-    padding: 1 2;
+    padding: 0 1;
     height: 100%;
 }
 
@@ -110,22 +112,21 @@ Screen {
 #input-panel {
     background: #181825;
     border: round #45475a;
-    padding: 1;
-    margin-bottom: 1;
+    padding: 0 1;
+    margin-bottom: 0;
     height: auto;
 }
 
 #input-label {
     color: #89b4fa;
     text-style: bold;
-    margin-bottom: 0;
 }
 
 #subject-input {
     background: #1e1e2e;
     border: tall #313244;
     color: #cdd6f4;
-    margin-top: 0;
+    height: 3;
 }
 
 #subject-input:focus {
@@ -135,14 +136,14 @@ Screen {
 /* Khối Timer và Thống kê */
 #middle-panel {
     height: auto;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
 
 #timer-card {
     background: #181825;
     border: round #89b4fa;
-    padding: 1 2;
-    width: 62%;
+    padding: 0 1;
+    width: 60%;
     height: auto;
     align: center middle;
 }
@@ -155,7 +156,6 @@ Screen {
     text-align: center;
     text-style: bold;
     color: #89b4fa;
-    padding: 0 1;
 }
 
 #timer-badge.mode-break-badge {
@@ -165,12 +165,12 @@ Screen {
 #timer-digits {
     text-align: center;
     color: #cdd6f4;
-    margin: 1 0;
+    margin: 0;
 }
 
 #timer-progress {
     width: 100%;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
 
 #timer-button-row {
@@ -181,15 +181,15 @@ Screen {
 
 #timer-button-row Button {
     margin: 0 1;
-    min-width: 13;
+    min-width: 11;
 }
 
 /* Thẻ thống kê bên phải */
 #stats-card {
     background: #181825;
     border: round #45475a;
-    padding: 1 2;
-    width: 38%;
+    padding: 0 1;
+    width: 40%;
     margin-left: 1;
     height: auto;
 }
@@ -198,8 +198,7 @@ Screen {
     text-style: bold;
     color: #fab387;
     border-bottom: solid #313244;
-    padding-bottom: 0;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
 
 .stat-row {
@@ -207,8 +206,8 @@ Screen {
 }
 
 #stats-instructions {
-    margin-top: 1;
-    padding-top: 1;
+    margin-top: 0;
+    padding-top: 0;
     border-top: dashed #313244;
     color: #a6adc8;
 }
@@ -217,15 +216,37 @@ Screen {
 #log-panel {
     background: #181825;
     border: round #45475a;
-    padding: 1;
+    padding: 0 1;
     height: 1fr;
-    min-height: 10;
+    min-height: 8;
+}
+
+#log-header-bar {
+    height: auto;
+    width: 100%;
+    align: right middle;
+    margin-bottom: 0;
 }
 
 #log-title {
     text-style: bold;
     color: #a6e3a1;
-    margin-bottom: 1;
+    width: 1fr;
+    content-align: left middle;
+}
+
+#btn-delete-log {
+    min-width: 24;
+    height: 1;
+    border: none;
+    background: #f38ba8;
+    color: #11111b;
+    text-style: bold;
+    padding: 0 1;
+}
+
+#btn-delete-log:hover {
+    background: #eba0ac;
 }
 
 #log-table {
@@ -252,7 +273,9 @@ class StudyDashboardApp(App):
         Binding("space", "toggle_timer", "Bắt đầu / Tạm dừng", show=True),
         Binding("r", "reset_timer", "Đặt lại (Reset)", show=True),
         Binding("m", "toggle_mode", "Đổi chế độ Học/Nghỉ", show=True),
-        Binding("t", "test_complete", "Test hoàn thành phiên", show=True),
+        Binding("t", "test_complete", "Test chuông & nghỉ", show=True),
+        Binding("d", "delete_selected_log", "Xóa phiên chọn", show=True),
+        Binding("delete", "delete_selected_log", "Xóa phiên chọn", show=False),
         Binding("q", "quit_app", "Thoát", show=True),
     ]
 
@@ -318,17 +341,16 @@ class StudyDashboardApp(App):
                     
                     with Static(id="stats-instructions"):
                         yield Label(
-                            "[dim]Phím tắt nhanh:[/dim]\n"
-                            "• [bold cyan]Space[/bold cyan]: Bắt đầu / Tạm dừng\n"
-                            "• [bold cyan]R[/bold cyan]: Đặt lại (Khôi phục mạng)\n"
-                            "• [bold cyan]M[/bold cyan]: Đổi chế độ Học ⟷ Nghỉ\n"
-                            "• [bold cyan]T[/bold cyan]: Thử ghi nhận phiên (Test)\n"
-                            "• [bold cyan]Q[/bold cyan]: Thoát (Khôi phục mạng)"
+                            "[dim]Phím tắt:[/dim] [bold cyan]Space[/bold cyan]: Chạy/Dừng | [bold cyan]R[/bold cyan]: Đặt lại | [bold cyan]M[/bold cyan]: Đổi chế độ\n"
+                            "• [bold cyan]T[/bold cyan]: Test chuông & nghỉ (Không lưu) | [bold cyan]D[/bold cyan]: Xóa phiên đã chọn\n"
+                            "• [bold cyan]Q[/bold cyan]: Thoát ứng dụng (Khôi phục mạng)"
                         )
 
             # 3. Hàng dưới: Bảng nhật ký học tập (Study Log)
             with Vertical(id="log-panel"):
-                yield Label("📋 NHẬT KÝ HỌC TẬP (STUDY LOG) — CSV PERSISTENT", id="log-title")
+                with Horizontal(id="log-header-bar"):
+                    yield Label("📋 NHẬT KÝ HỌC TẬP (STUDY LOG) — CSV PERSISTENT", id="log-title")
+                    yield Button("🗑️ Xóa phiên đã chọn (Phím D)", id="btn-delete-log", variant="error")
                 yield DataTable(id="log-table", zebra_stripes=True, cursor_type="row")
 
         yield Footer()
@@ -419,6 +441,64 @@ class StudyDashboardApp(App):
             self.notify(f"Không thể ghi nhật ký vào CSV: {e}", severity="error")
             return False
 
+    def delete_selected_log(self) -> None:
+        """Xóa dòng nhật ký đang được chọn trên bảng DataTable và tệp CSV."""
+        table = self.query_one("#log-table", DataTable)
+        if not table.rows:
+            self.notify("Bảng nhật ký đang trống, không có dòng để xóa.", title="Thông báo", severity="warning", timeout=3)
+            return
+
+        cursor_row = table.cursor_row
+        if cursor_row is None or cursor_row < 0 or cursor_row >= len(table.rows):
+            self.notify("Vui lòng dùng phím mũi tên hoặc chuột chọn một dòng trên bảng để xóa.", title="Chưa chọn dòng", severity="warning", timeout=3)
+            return
+
+        if not self.csv_path.exists():
+            self.notify("Không tìm thấy tệp CSV nhật ký.", severity="error", timeout=3)
+            return
+
+        try:
+            with open(self.csv_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+                rows = list(reader)
+
+            if not (0 <= cursor_row < len(rows)):
+                self.notify("Vị trí dòng chọn không hợp lệ.", severity="error", timeout=3)
+                return
+
+            deleted_row = rows.pop(cursor_row)
+            deleted_subject = deleted_row[2] if len(deleted_row) > 2 else "Phiên học"
+            deleted_stt = deleted_row[0] if len(deleted_row) > 0 else str(cursor_row + 1)
+
+            # Đánh số lại STT cho các dòng còn lại
+            for idx, r in enumerate(rows, start=1):
+                if len(r) > 0:
+                    r[0] = str(idx)
+
+            # Ghi lại danh sách mới vào tệp CSV
+            with open(self.csv_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(header or ["STT", "ThoiGian", "MonHoc", "ThoiLuong", "TrangThai"])
+                writer.writerows(rows)
+
+            # Nạp lại bảng và cập nhật khung Thống kê
+            self.load_history_from_csv()
+
+            # Điều chỉnh vị trí con trỏ sau khi xóa
+            if rows:
+                new_cursor = min(cursor_row, len(rows) - 1)
+                table.move_cursor(row=new_cursor)
+
+            self.notify(
+                f"Đã xóa phiên: {deleted_subject} (#{deleted_stt}) khỏi nhật ký.",
+                title="🗑️ Đã xóa phiên học",
+                severity="warning",
+                timeout=4,
+            )
+        except Exception as e:
+            self.notify(f"Lỗi khi xóa dòng nhật ký: {e}", severity="error", timeout=4)
+
     # --- Quản lý chặn web (/etc/hosts) ---
 
     def activate_web_blocker(self) -> None:
@@ -448,7 +528,7 @@ class StudyDashboardApp(App):
             self.pomo_seconds_left -= 1
             self.update_timer_display()
         else:
-            # Hết thời gian phiên hiện tại
+            # Hết thời gian phiên đếm ngược thực tế (chạy đủ 25 phút về 00:00)
             self.on_session_finished()
 
     def update_timer_display(self) -> None:
@@ -537,12 +617,13 @@ class StudyDashboardApp(App):
                 pass
 
     def on_session_finished(self) -> None:
-        """Xử lý khi hoàn thành một phiên đếm ngược."""
+        """Xử lý khi một phiên đếm ngược thực tế chạy đủ thời gian về 00:00."""
         self.pomo_running = False
-        self.pomo_timer.pause()
+        if self.pomo_timer:
+            self.pomo_timer.pause()
 
         if self.pomo_mode == "work":
-            # Tăng số phiên và thời lượng
+            # Chỉ ghi nhận phiên khi đếm ngược thực tế đủ 25 phút về 00:00
             self.completed_pomodoros += 1
             self.total_focus_minutes += 25
 
@@ -591,7 +672,8 @@ class StudyDashboardApp(App):
         """Chuyển đổi giữa chế độ Học (Work) và Nghỉ (Break)."""
         self.pomo_mode = mode
         self.pomo_running = False
-        self.pomo_timer.pause()
+        if self.pomo_timer:
+            self.pomo_timer.pause()
 
         timer_card = self.query_one("#timer-card")
         badge = self.query_one("#timer-badge", Label)
@@ -633,12 +715,15 @@ class StudyDashboardApp(App):
             self.reset_timer()
         elif button_id == "btn-toggle-mode":
             self.toggle_mode()
+        elif button_id == "btn-delete-log":
+            self.delete_selected_log()
 
     def start_timer(self) -> None:
         """Bắt đầu chạy đồng hồ Pomodoro. Nếu là phiên học 25p, tự động kích hoạt chặn web."""
         if not self.pomo_running:
             self.pomo_running = True
-            self.pomo_timer.resume()
+            if self.pomo_timer:
+                self.pomo_timer.resume()
 
             if self.pomo_mode == "work":
                 # Kích hoạt chặn web xao nhãng trong phiên học tập
@@ -653,14 +738,16 @@ class StudyDashboardApp(App):
         """Tạm dừng đồng hồ Pomodoro."""
         if self.pomo_running:
             self.pomo_running = False
-            self.pomo_timer.pause()
+            if self.pomo_timer:
+                self.pomo_timer.pause()
             self.update_stats_panel()
             self.notify("Đã tạm dừng đồng hồ.", severity="warning", timeout=3)
 
     def reset_timer(self) -> None:
         """Đặt lại đồng hồ về ban đầu và tự động bỏ chặn web (khôi phục mạng)."""
         self.pomo_running = False
-        self.pomo_timer.pause()
+        if self.pomo_timer:
+            self.pomo_timer.pause()
 
         # Khi bấm Đặt lại: Khôi phục lại mạng bình thường
         self.deactivate_web_blocker()
@@ -697,10 +784,28 @@ class StudyDashboardApp(App):
         self.toggle_mode()
 
     def action_test_complete(self) -> None:
-        """Phím T: Thử nghiệm hoàn thành phiên học ngay lập tức để kiểm tra CSV, bảng và chuông báo."""
-        self.pomo_mode = "work"
-        self.pomo_seconds_left = 0
-        self.on_session_finished()
+        """Phím T: Thử nghiệm phát chuông và chuyển sang Nghỉ giải lao (KHÔNG ghi vào CSV hay tăng thống kê)."""
+        self.pomo_running = False
+        if self.pomo_timer:
+            self.pomo_timer.pause()
+
+        # 1. Vẫn phát chuông âm thanh paplay và bắn thông báo desktop
+        self.play_session_alerts()
+
+        # 2. Chuyển sang chế độ nghỉ giải lao 5 phút (và tự động bỏ chặn web)
+        self.switch_to_mode("break")
+
+        # 3. Thông báo rõ ràng cho người dùng
+        self.notify(
+            "Đã phát chuông & chuyển sang Nghỉ giải lao (Test).\nPhiên test KHÔNG được ghi vào lịch sử học tập.",
+            title="🧪 Thử nghiệm (Không lưu dữ liệu)",
+            severity="information",
+            timeout=6,
+        )
+
+    def action_delete_selected_log(self) -> None:
+        """Phím D hoặc Delete: Xóa dòng nhật ký đang chọn khỏi bảng và CSV."""
+        self.delete_selected_log()
 
     def action_quit_app(self) -> None:
         """Phím Q: Gỡ bỏ chặn web và thoát ứng dụng an toàn."""
